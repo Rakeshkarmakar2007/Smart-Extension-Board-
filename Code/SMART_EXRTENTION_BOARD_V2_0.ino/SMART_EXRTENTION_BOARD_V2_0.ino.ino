@@ -1,6 +1,6 @@
-#define BLYNK_TEMPLATE_ID "TMPL3fqjd2-GQ"
-#define BLYNK_TEMPLATE_NAME "Smart Home"
-#define BLYNK_AUTH_TOKEN "FE-C5DBkwDVSwZZw8RbodVRkPYYhB_0Q"
+#define BLYNK_TEMPLATE_ID "replace_with_your_Blynk_TEMPLATE_ID"
+#define BLYNK_TEMPLATE_NAME "replace_with_your_Blynk_TEMPLATE_NAME"
+#define BLYNK_AUTH_TOKEN "replace_with_your_Blynk_AUTH_TOKEN"
 #define BLYNK_PRINT Serial
 
 

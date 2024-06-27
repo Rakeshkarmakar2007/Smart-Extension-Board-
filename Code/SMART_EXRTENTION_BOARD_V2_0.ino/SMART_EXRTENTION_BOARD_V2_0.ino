@@ -1,6 +1,6 @@
-#define BLYNK_TEMPLATE_ID "replace_with_your_Blynk_TEMPLATE_ID"
-#define BLYNK_TEMPLATE_NAME "replace_with_your_Blynk_TEMPLATE_NAME"
-#define BLYNK_AUTH_TOKEN "replace_with_your_Blynk_AUTH_TOKEN"
+#define BLYNK_TEMPLATE_ID "TMPL3fqjd2-GQ"
+#define BLYNK_TEMPLATE_NAME "Smart Home"
+#define BLYNK_AUTH_TOKEN "FE-C5DBkwDVSwZZw8RbodVRkPYYhB_0Q"
 #define BLYNK_PRINT Serial
 
 
@@ -43,8 +43,8 @@ const int day1offadd = 231, day2offadd = 232, day3offadd = 233, day4offadd = 234
 const int toggle1onadd = 235, toggle2onadd = 236, toggle3onadd = 237, toggle4onadd = 238;
 const int toggle1offadd = 239, toggle2offadd = 240, toggle3offadd = 241, toggle4offadd = 242;
 
-const int time1onadd = 240, time2onadd = 265, time3onadd = 290, time4onadd = 315;
-const int time1offadd = 340, time2offadd = 365, time3offadd = 390, time4offadd = 415, flagadd = 460;
+const int time1onadd = 245, time2onadd = 265, time3onadd = 285, time4onadd = 305;
+const int time1offadd = 325, time2offadd = 345, time3offadd = 365, time4offadd = 385, flagadd = 405;
 
 
 String SSID;

@@ -9,6 +9,392 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Control</title>
 
+
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Control</title>
+
+    <style>
+
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            background-color: #ffc400bd;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 500px;
+            width: 90%;
+            background: linear-gradient(to right, rgb(180, 255, 60), rgb(248, 156, 51));
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .fb {
+            display: inline-block;
+            padding: 6px 3px;
+            height: 2px; /* Adjust height as needed */
+            line-height: 2px; /* Center text vertically */
+            width: 255px;
+            color: #fff;
+            text-decoration: none;
+            font-size: 10px;
+            border-radius: 10px;
+            background-color: #3b5998;
+            margin-top: 1px;
+            margin-bottom: 30px;
+        }
+
+        h4{
+            margin-top: 1px;
+            font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+            margin-bottom: 10px;
+        }
+        h1 {
+            font-size: 30px;
+            color: #000000;
+            margin-bottom: 1px;
+        }
+
+        input[type="text"],
+        input[type="text"] {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+        }
+
+        input[type="submit"] {
+            width: calc(100% - 20px);
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+            border: none;
+            background-color: #007bff;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        .socket {
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 20px;
+            border-radius: 20px;
+            background-color: #ffffff;
+        }
+
+        .socket label {
+            font-size: 18px;
+            color: #000000;
+        }
+
+        .switch {
+            display: inline-block;
+            position: relative;
+            width: 150px;
+            height: 40px;
+            margin-left: auto;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .switch input {
+            display: none;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ff0000;
+            border-radius: 15px;
+            transition: background-color 1s;
+
+        }
+
+        button{
+            display: inline-block;
+            height: 20px;
+            width: 60px;
+            font-size: 7px; 
+            margin-top: 6px;
+            background-color: #ff2020;
+            color: white;
+        }
+
+        input:checked + .slider::before {
+            content: "ON";
+            color: rgb(0, 0, 0); 
+            z-index: 2; 
+            padding: 0 20px; 
+            font-size: 35px;
+            pointer-events: none; 
+            
+        }
+        
+        .slider::before {
+            content: "OFF";
+            color: rgb(255, 255, 255); 
+            z-index: 2; 
+            padding: 0 20px; 
+            font-size: 35px;
+            pointer-events: none; 
+            
+        }
+
+        input:checked + .slider {
+            background-color: #00ff08;
+        }
+        
+        .alert-banner {
+        width: 100%;
+        background-color: #ff4d4d; /* Red background */
+        color: white; /* White text color */
+        text-align: center;
+        padding: 10px 0;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1000; /* Make sure it's on top */
+        }
+
+        
+        @media only screen and (max-width: 600px) {
+            .container {
+                width: 100%;
+            }
+
+            .socket {
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                padding: 10px;
+            }
+
+            .socket label {
+                margin-bottom: 10px;
+            }
+            .switch {
+                margin-left: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loginContainer" class="container">
+        <h2>Login</h2>
+        <form id="loginForm">
+            <input type="text" id="username" placeholder="Enter server address">
+            <input type="text" id="authToken" placeholder="Enter authentication token">
+            <input type="submit" value="Login">
+        </form>
+    </div>
+
+    
+    <div id="controlContainer" class="container" style="display: none;">
+        
+            <h1>Smart Extension Board</h1>
+            <a class="fb" href="https://www.facebook.com/profile.php?id=100076382650422&mibextid=ZbWKwL">By Rakesh Karmakar</a>
+            <h4>control &nbsp; &nbsp; from &nbsp;&nbsp; anywhere &nbsp;&nbsp; in &nbsp;&nbsp; the &nbsp;&nbsp; world</h4>
+    
+            <div class="socket">
+                <label for="socket1">Socket 1:</label>
+                <label class="switch">
+                    <input type="checkbox" id="socket1" onchange="Socket(1, this.checked)">
+                    <span class="slider"></span>
+                    <label class="off-label">OFF</label>
+                    <label class="on-label">ON</label>
+                </label>
+            </div>
+            
+            <div class="socket">
+                <label for="socket2">Socket 2:</label>
+                <label class="switch">
+                    <input type="checkbox" id="socket2" onchange="Socket(2, this.checked)">
+                    <span class="slider"></span>
+                    <label class="off-label">OFF</label>
+                    <label class="on-label">ON</label>
+                </label>
+            </div>
+    
+            <div class="socket">
+                <label for="socket3">Socket 3:</label>
+                <label class="switch">
+                    <input type="checkbox" id="socket3" onchange="Socket(3, this.checked)">
+                    <span class="slider"></span>
+                    <label class="off-label">OFF</label>
+                    <label class="on-label">ON</label>
+                </label>
+            </div>
+            
+            <div class="socket">
+                <label for="socket4">Socket 4:</label>
+                <label class="switch">
+                    <input type="checkbox" id="socket4" onchange="Socket(4, this.checked)">
+                    <span class="slider"></span>
+                    <label class="off-label">OFF</label>
+                    <label class="on-label">ON</label>
+                </label>
+            </div>
+            
+            <button onclick="Logout()">Logout</button>
+        </div>
+        
+        
+        <div class="alert-banner" id = "ll" style="display: none;">
+            Check Your Internet Connection 🛜
+        </div>
+
+        <div class="alert-banner" id = "kk" style="display: none;">
+            Your Board Is Not Connected To Blynk Server!! 🔌
+        </div>
+
+
+        <script>
+            var username;
+            var authToken;
+            var isLoggedIn;
+            var storedUsername = localStorage.getItem("username");
+            var storedAuthToken = localStorage.getItem("authToken");
+        
+            // Function to update the state of switches
+            function updateSwitches() {
+                let urls = [
+                    'https://' + username + '.blynk.cloud/external/api/get?token=' + authToken + '&v1',
+                    'https://' + username + '.blynk.cloud/external/api/get?token=' + authToken + '&v2',
+                    'https://' + username + '.blynk.cloud/external/api/get?token=' + authToken + '&v3',
+                    'https://' + username + '.blynk.cloud/external/api/get?token=' + authToken + '&v4'
+                ];
+        
+                Promise.all(urls.map(url =>
+                    fetch(url)
+                    .then(response => {
+                        if (response.ok) {
+                            return response.text();
+                        }
+                        throw new Error('Network response was not ok for ' + url);
+                    })
+                ))
+                .then(dataArray => {
+                    // Update switch states
+                    document.getElementById("socket1").checked = dataArray[0] === '1';
+                    document.getElementById("socket2").checked = dataArray[1] === '1';
+                    document.getElementById("socket3").checked = dataArray[2] === '1';
+                    document.getElementById("socket4").checked = dataArray[3] === '1';
+                })
+                .catch(error => {
+                    // Handle errors if any
+                    console.error(error);
+                });
+            }
+        
+            // Function to handle socket toggling
+            function Socket(val, checked) {
+                var state = checked ? 1 : 0;
+                var url = "https://" + username + ".blynk.cloud/external/api/update?token=" + authToken + "&v" + val + "=" + state;
+                fetch(url)
+                    .then(() => {
+                        // Update switches after successful toggle
+                        updateSwitches();
+                    })
+                    .catch(error => {
+                        // Handle errors if any
+                        console.error(error);
+                    });
+            }
+        
+            // Function to check hardware connection
+            function checkHardwareConnection() {
+                fetch(`https://${username}.blynk.cloud/external/api/isHardwareConnected?token=${authToken}`)
+                    .then(response => {
+                        if (response.ok) {
+                            return response.text();
+                        }
+                    })
+                    .then(data => {
+                        const trimedata = data.trim()
+                        if (trimedata === 'true') {
+                            document.getElementById("kk").style.display = "none";
+                            document.getElementById("ll").style.display = "none";
+        
+                        } else if (trimedata === 'false') {
+                            document.getElementById("kk").style.display = "block";
+                            document.getElementById("ll").style.display = "none";
+        
+                        }
+                    })
+                    .catch(error => {
+                        document.getElementById("ll").style.display = "block";
+                        document.getElementById("kk").style.display = "none";
+        
+                    });
+            }
+            function Logout(){
+                document.getElementById("kk").style.display = "none";
+                document.getElementById("ll").style.display = "none";
+                document.getElementById("loginContainer").style.display = "block";
+                document.getElementById("controlContainer").style.display = "none";
+        
+            }
+        
+            // Function to handle login form submission
+            document.getElementById("loginForm").addEventListener("submit", function(event) {
+                event.preventDefault();
+                username = document.getElementById("username").value;
+                authToken = document.getElementById("authToken").value;
+                localStorage.setItem("username", username);
+                localStorage.setItem("authToken", authToken);
+                isLoggedIn = true;
+                checkHardwareConnection();
+                updateSwitches(); // Update switches after login
+                document.getElementById("loginContainer").style.display = "none";
+                document.getElementById("controlContainer").style.display = "block";
+        
+                
+                setInterval(updateSwitches, 500);
+            });
+        
+            // Check if user is already logged in
+            if (storedUsername && storedAuthToken) {
+                document.getElementById("username").value = storedUsername;
+                document.getElementById("authToken").value = storedAuthToken;
+                username = document.getElementById("username").value;
+                authToken = document.getElementById("authToken").value;
+                isLoggedIn = true;
+                checkHardwareConnection();
+                document.getElementById("loginContainer").style.display = "none";
+                document.getElementById("controlContainer").style.display = "block";
+                updateSwitches(); // Update switches if user is already logged in
+        
+                // Start updating switches every 0.5 seconds
+                setInterval(updateSwitches, 500);
+            }
+        </script>
+        
+    </body>
+
+</html>
+    
     <style>
 
         body {

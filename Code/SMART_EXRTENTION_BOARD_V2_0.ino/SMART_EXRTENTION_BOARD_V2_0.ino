@@ -3,15 +3,15 @@
 #define BLYNK_AUTH_TOKEN "YOUR_AUTH_TOKEN"
 #define BLYNK_PRINT Serial
 
-
 #include <WiFi.h>
 #include <Wire.h>
 #include <RTClib.h>
 #include <EEPROM.h>
 #include <IRrecv.h>
 #include <WiFiUdp.h>
-#include <NTPClient.h>
 #include <IRutils.h>
+#include <Arduino.h>
+#include <NTPClient.h>
 #include <WebServer.h>
 #include <ESP32Ping.h>
 #include <DNSServer.h>
@@ -19,47 +19,61 @@
 #include <IRremoteESP8266.h>
 #include <BlynkSimpleEsp32.h>
 
-// WiFi credentials
-char auth[] = BLYNK_AUTH_TOKEN;
-int attempt = 0; 
+// EEPROM Adrresses
+#define ssidAddr 1
+#define passAddr 50
+#define ipaddr 100
+#define wifiStatus 134
+#define l1 135
+#define l2 136
+#define l3 137
+#define l4 138
+#define sliderAdd 139
+#define ir1add 140
+#define ir2add 150
+#define ir3add 160
+#define ir4add 170
+#define ir5add 180
+#define ir6add 190
+#define ir7add 200 
+#define ir8add 210
+#define sw1add 220
+#define sw2add 221
+#define sw3add 222
+#define sw4add 223
+#define coadd 224
+#define Reg  225
 
-WebServer server(80);
-DNSServer dnsServer;
-RTC_DS1307 rtc;
+#define day1onadd 227
+#define day2onadd 228
+#define day3onadd 229
+#define day4onadd 230
+#define day1offadd 231
+#define day2offadd 232
+#define day3offadd 233
+#define day4offadd 234
 
-const char *ssid = "SMART EXTENTION BOARD V2.0";
+#define toggle1onadd 235
+#define toggle2onadd 236 
+#define toggle3onadd 237 
+#define toggle4onadd 238
+#define toggle1offadd 239 
+#define toggle2offadd 240 
+#define toggle3offadd 241 
+#define toggle4offadd 242
 
-const int ssidAddr = 1;
-const int passAddr = 50;
-const int ipaddr = 100;
-const int wifiStatus = 134;
-const int l1 = 135, l2 = 136, l3 = 137, l4 = 138, sliderAdd = 139;
-const int ir1add = 140, ir2add = 150, ir3add = 160, ir4add = 170, ir5add = 180, ir6add = 190, ir7add = 200, ir8add = 210;
-const int sw1add = 220, sw2add = 221, sw3add = 222, sw4add = 223, coadd = 224, Reg = 225;
+#define time1onadd 245
+#define time2onadd 265
+#define time3onadd 285
+#define time4onadd 305
+#define time1offadd 325
+#define time2offadd 345
+#define time3offadd 365
+#define time4offadd 385
+#define flagadd  405
+//end address
 
-const int day1onadd = 227, day2onadd = 228, day3onadd = 229, day4onadd = 230;
-const int day1offadd = 231, day2offadd = 232, day3offadd = 233, day4offadd = 234;
-
-const int toggle1onadd = 235, toggle2onadd = 236, toggle3onadd = 237, toggle4onadd = 238;
-const int toggle1offadd = 239, toggle2offadd = 240, toggle3offadd = 241, toggle4offadd = 242;
-
-const int time1onadd = 245, time2onadd = 265, time3onadd = 285, time4onadd = 305;
-const int time1offadd = 325, time2offadd = 345, time3offadd = 365, time4offadd = 385, flagadd = 405;
-
-
-String SSID;
-String PASS;
-String IP;
-String value;
-
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP, "in.pool.ntp.org", 19800);
-const IPAddress remote_ip(8, 8, 8, 8);
-
-bool preSw1State, preSw2State, preSw3State, preSw4State, flag = false, flagon1=true, flagon2=true, flagon3=true, flagon4=true, flagoff1=true, flagoff2=true, flagoff3=true, flagoff4=true;
-int preRegVal;
-bool pin1status, pin2status, pin3status, pin4status, condition, var;
-
+// define gpio pins
 #define pin1 4
 #define pin2 16
 #define pin3 17
@@ -72,13 +86,37 @@ bool pin1status, pin2status, pin3status, pin4status, condition, var;
 #define sw3 26
 #define sw4 27
 #define config 32
+//end gpio
 
-int sliderValue;
-int wifi = 0, k = 0;
-bool AP = true;
+DNSServer dnsServer;
+RTC_DS1307 rtc;
+WiFiUDP ntpUDP;
+decode_results results;
+
+TaskHandle_t Task1;
+TaskHandle_t Task2;
+WebServer server(80);
+IRrecv irrecv(IR_PIN);
+NTPClient timeClient(ntpUDP, "in.pool.ntp.org", 19800);
+
+const char *ssid = "SMART EXTENTION BOARD V2.1";
+const IPAddress remote_ip(8, 8, 8, 8);
+char auth[] = BLYNK_AUTH_TOKEN;
+
+String SSID;
+String PASS;
+String IP;
+String value;
+
+bool preSw1State, preSw2State, preSw3State, preSw4State, flag = false, flagon1=true, flagon2=true, flagon3=true, flagon4=true, flagoff1=true, flagoff2=true, flagoff3=true, flagoff4=true;
+bool pin1status, pin2status, pin3status, pin4status, condition, var;
+int sliderValue, preRegVal;
+int wifi = 0;
+bool AP = true, connected_to_blynk =  false;
 uint64_t ir1, ir2, ir3, ir4, ir5, ir6, ir7, ir8;
 int add = 0;
 
+//alarm details________________________________________________________________________________________________________________________________________________---
 int socket4DayOn, socket4DayOff;
 String socket4TimeOn, socket4TimeOff;
 bool socket4ToggleOn, socket4ToggleOff;
@@ -96,14 +134,10 @@ String socket1TimeOn, socket1TimeOff;
 bool socket1ToggleOn, socket1ToggleOff;
 
 String day[] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Everyday" };
+//end allarm details________________________________________________________________________________________________________________________________________---
 
-bool connected_to_blynk =  false;
-int c=0;
-
-IRrecv irrecv(IR_PIN);
-decode_results results;
-
-void setup() {
+//setup _____________________________________________________________________________________________________________________________________________________---
+void setup() {          
   pinMode(pin1, OUTPUT);
   pinMode(pin2, OUTPUT);
   pinMode(pin3, OUTPUT);
@@ -117,97 +151,33 @@ void setup() {
   pinMode(sw4, INPUT_PULLUP);
   pinMode(config, INPUT_PULLUP);
 
-  if (!rtc.begin()) {
-    Serial.println("Couldn't find RTC");
-  }
 
-  Serial.begin(112500);
+  if (!rtc.begin()){} 
   irrecv.enableIRIn();
   digitalWrite(Net, LOW);
   readDetails();
-  analogWrite(pwm, sliderValue);
-  sw();
+  analogWrite(pwm, sliderValue);  // update fan speed
+  sw();                           //update switches
   value = String((sliderValue / 255.0) * 100);
-  if ((wifi == 1) && (condition == 1)) {
+
+  xTaskCreatePinnedToCore(Task1Code, "Task 1", 10000, NULL, 10, &Task1, 0);           
+  if ((wifi == 1) && (condition)) {
     AP = false;
-    Serial.println("Connecting to WiFi...");
-    Serial.println(SSID);
-    Serial.print("Password: ");
-    Serial.println(PASS);
     WiFi.begin(SSID.c_str(), PASS.c_str());
     while (WiFi.status() != WL_CONNECTED) {
-
-      if ((digitalRead(sw1) != preSw1State) || (digitalRead(sw2) != preSw2State) || (digitalRead(sw3) != preSw3State) || (digitalRead(sw4) != preSw4State) || (int(((analogRead(A0) / 100) / 40.0) * 255) != preRegVal)) {
-        sw();
-      }
-      if(flag){
-        digitalWrite(Net, HIGH);
-        delay(200);
-        digitalWrite(Net, LOW);
-        delay(200);
-      }
-
-      if (digitalRead(config) == 0) {
-        digitalWrite(Net, LOW);
-        delay(200);
-        digitalWrite(Net, HIGH);
-        delay(200);
-        digitalWrite(Net, LOW);
-        AP = true;
-        putcondition(false, false);
-        ESP.restart();
-      }
-
-      if (irrecv.decode(&results)) {
-        remote();
-        irrecv.resume();
-      }
-      if (!pin1status) {
-        digitalWrite(pin1, LOW);
-      } else {
-        digitalWrite(pin1, HIGH);
-      }
-      if (!pin2status) {
-        digitalWrite(pin2, LOW);
-      } else {
-        digitalWrite(pin2, HIGH);
-      }
-      if (!pin3status) {
-        digitalWrite(pin3, LOW);
-      } else {
-        digitalWrite(pin3, HIGH);
-      }
-      if (!pin4status) {
-        digitalWrite(pin4, LOW);
-      } else {
-        digitalWrite(pin4, HIGH);
-      }
-      if (socket1ToggleOn || socket1ToggleOff || socket2ToggleOn || socket2ToggleOff || socket3ToggleOn || socket3ToggleOff || socket4ToggleOn || socket4ToggleOff) {
-        if (k == 1000) {
-          timer();
-          k = 0;
-        }
-        k++;
-      }
-      DateTime now = rtc.now();
-      if((now.hour() == 0 && now.minute() == 1) || (now.hour() == 6 && now.minute() == 1) || (now.hour() == 12 && now.minute() == 1) || (now.hour() == 18 && now.minute() == 1) ){
-        ESP.restart();
-      }
-      delay(10);
+      digitalWrite(Net, HIGH);
+      delay(200);
+      digitalWrite(Net, LOW);
+      delay(200);
+      if (socket1ToggleOn|| socket1ToggleOff || socket2ToggleOn || socket2ToggleOff|| socket3ToggleOn|| socket3ToggleOff || socket4ToggleOn || socket4ToggleOff ) { timer(); }
     }
     
-
-
     IPAddress ip = WiFi.localIP();
     IP = ip.toString();
-    Serial.println("\nConnected to WiFi");
     writeIP(IP);
-    Serial.print("IP Address: ");
-    Serial.println(IP);
-    
     digitalWrite(Net, HIGH);
+    timeClient.begin();
     if(flag){
-      flag = false;
       putcondition(false, false);
       AP = true;
       ESP.restart();
@@ -217,9 +187,9 @@ void setup() {
     WiFi.softAP(ssid);
     WiFi.scanNetworks(true, true);
   }
+
   server.begin();
   dnsServer.start(53, "*", WiFi.softAPIP());
-
 
   server.on("/", handleRoot);
   server.on("/credentials", handledetails);
@@ -233,7 +203,7 @@ void setup() {
   server.on("/l4off", hand4off);
   server.on("/IP", handleIP);
   server.on("/factory", handlereset);
-  server.on("/IR", handleremote);
+  server.on("/IR", handleRemote);
   server.on("/send-value", handleSendValue);
   server.on("/Timer", handleTimer);
   server.on("/set-alarm", HTTP_POST, handleData);
@@ -241,17 +211,11 @@ void setup() {
   server.on("/RTC", handleRTC);
   server.on("/close", Close);
   server.onNotFound(handleNotFound);
-
-
-  server.begin();
-  timeClient.begin();
+  xTaskCreatePinnedToCore(Task2Code, "Task 2", 10000, NULL, 5, &Task2, 1);   
 }
+// END void setup___________________________________________________________________________________________________________________________________________---
 
-void Close(){
-  putcondition(true, false);
-  ESP.restart();
-}
-
+// part of eeprom___________________________________________________________________________________________________________________________________________---
 void ledState() {
   EEPROM.begin(512);
   EEPROM.write(l1, pin1status);
@@ -266,32 +230,18 @@ void ledState() {
   EEPROM.write(sliderAdd, sliderValue);
   EEPROM.commit();
   EEPROM.end();
-if(connected_to_blynk){
-  if(pin1status){
-    Blynk.virtualWrite(1, HIGH);
-  }else{
-    Blynk.virtualWrite(1, LOW);
-  }
 
-  if(pin2status){
-    Blynk.virtualWrite(2, HIGH);
-  }else{
-    Blynk.virtualWrite(2, LOW);
+  if(connected_to_blynk){
+    Blynk.virtualWrite(1, pin1status? HIGH : LOW);
+    Blynk.virtualWrite(2, pin2status? HIGH : LOW);
+    Blynk.virtualWrite(3, pin3status? HIGH : LOW);
+    Blynk.virtualWrite(4, pin4status? HIGH : LOW);
   }
-
-  if(pin3status){
-    Blynk.virtualWrite(3, HIGH);
-  }else{
-    Blynk.virtualWrite(3, LOW);
-  }
-
-  if(pin4status){
-    Blynk.virtualWrite(4, HIGH);
-  }else{
-    Blynk.virtualWrite(4, LOW);
-  }
-}
   
+  digitalWrite(pin1, pin1status? HIGH : LOW);
+  digitalWrite(pin2, pin2status? HIGH : LOW);
+  digitalWrite(pin3, pin3status? HIGH : LOW);
+  digitalWrite(pin4, pin4status? HIGH : LOW);
 }
 
 void saveAlarm() {
@@ -301,49 +251,37 @@ void saveAlarm() {
   EEPROM.write(day3onadd, socket3DayOn);
   EEPROM.write(day4onadd, socket4DayOn);
 
-  for (int i = 0; i < socket1TimeOn.length(); ++i) {
-    EEPROM.write(time1onadd + i, socket1TimeOn[i]);
-  }
+  for (int i = 0; i < socket1TimeOn.length(); ++i) { EEPROM.write(time1onadd + i, socket1TimeOn[i]);}
   EEPROM.write(time1onadd + socket1TimeOn.length(), '\0');
-  for (int i = 0; i < socket2TimeOn.length(); ++i) {
-    EEPROM.write(time2onadd + i, socket2TimeOn[i]);
-  }
-  EEPROM.write(time2onadd + socket2TimeOn.length(), '\0');
-  for (int i = 0; i < socket3TimeOn.length(); ++i) {
-    EEPROM.write(time3onadd + i, socket3TimeOn[i]);
-  }
-  EEPROM.write(time3onadd + socket3TimeOn.length(), '\0');
-  for (int i = 0; i < socket4TimeOn.length(); ++i) {
-    EEPROM.write(time4onadd + i, socket4TimeOn[i]);
-  }
-  EEPROM.write(time4onadd + socket4TimeOn.length(), '\0');
 
+  for (int i = 0; i < socket2TimeOn.length(); ++i) { EEPROM.write(time2onadd + i, socket2TimeOn[i]);}
+  EEPROM.write(time2onadd + socket2TimeOn.length(), '\0');
+
+  for (int i = 0; i < socket3TimeOn.length(); ++i) { EEPROM.write(time3onadd + i, socket3TimeOn[i]);}
+  EEPROM.write(time3onadd + socket3TimeOn.length(), '\0');
+
+  for (int i = 0; i < socket4TimeOn.length(); ++i) { EEPROM.write(time4onadd + i, socket4TimeOn[i]);}
+  EEPROM.write(time4onadd + socket4TimeOn.length(), '\0');
 
   EEPROM.write(toggle1onadd, socket1ToggleOn);
   EEPROM.write(toggle2onadd, socket2ToggleOn);
   EEPROM.write(toggle3onadd, socket3ToggleOn);
   EEPROM.write(toggle4onadd, socket4ToggleOn);
-
   EEPROM.write(day1offadd, socket1DayOff);
   EEPROM.write(day2offadd, socket2DayOff);
   EEPROM.write(day3offadd, socket3DayOff);
   EEPROM.write(day4offadd, socket4DayOff);
 
-  for (int i = 0; i < socket1TimeOff.length(); ++i) {
-    EEPROM.write(time1offadd + i, socket1TimeOff[i]);
-  }
+  for (int i = 0; i < socket1TimeOff.length(); ++i) {  EEPROM.write(time1offadd + i, socket1TimeOff[i]);  }
   EEPROM.write(time1offadd + socket1TimeOff.length(), '\0');
-  for (int i = 0; i < socket2TimeOff.length(); ++i) {
-    EEPROM.write(time2offadd + i, socket2TimeOff[i]);
-  }
+
+  for (int i = 0; i < socket2TimeOff.length(); ++i) {  EEPROM.write(time2offadd + i, socket2TimeOff[i]);  }
   EEPROM.write(time2offadd + socket2TimeOff.length(), '\0');
-  for (int i = 0; i < socket3TimeOff.length(); ++i) {
-    EEPROM.write(time3offadd + i, socket3TimeOff[i]);
-  }
+
+  for (int i = 0; i < socket3TimeOff.length(); ++i) {  EEPROM.write(time3offadd + i, socket3TimeOff[i]);  }
   EEPROM.write(time3offadd + socket3TimeOff.length(), '\0');
-  for (int i = 0; i < socket4TimeOff.length(); ++i) {
-    EEPROM.write(time4offadd + i, socket4TimeOff[i]);
-  }
+
+  for (int i = 0; i < socket4TimeOff.length(); ++i) {  EEPROM.write(time4offadd + i, socket4TimeOff[i]);  }
   EEPROM.write(time4offadd + socket4TimeOff.length(), '\0');
 
   EEPROM.write(toggle1offadd, socket1ToggleOff);
@@ -357,16 +295,13 @@ void saveAlarm() {
 
 void saveDetails(String ssid, String password) {
   EEPROM.begin(512);
-  for (int i = 0; i < ssid.length(); ++i) {
-    EEPROM.write(ssidAddr + i, ssid[i]);
-  }
+  for (int i = 0; i < ssid.length(); ++i) {  EEPROM.write(ssidAddr + i, ssid[i]); }
   EEPROM.write(ssidAddr + ssid.length(), '\0');
 
-  for (int i = 0; i < password.length(); ++i) {
-    EEPROM.write(passAddr + i, password[i]);
-  }
+  for (int i = 0; i < password.length(); ++i) {  EEPROM.write(passAddr + i, password[i]); }
   EEPROM.write(passAddr + password.length(), '\0');
   EEPROM.write(wifiStatus, 1);
+
   EEPROM.commit();
   EEPROM.end();
 }
@@ -413,31 +348,14 @@ void readDetails() {
   wifi = EEPROM.read(wifiStatus);
   sliderValue = 0;
 
-
-  for (int i = 0; i < sizeof(ir1); ++i) {
-    ir1 |= (uint64_t)EEPROM.read(ir1add + i) << (i * 8);
-  }
-  for (int i = 0; i < sizeof(ir2); ++i) {
-    ir2 |= (uint64_t)EEPROM.read(ir2add + i) << (i * 8);
-  }
-  for (int i = 0; i < sizeof(ir3); ++i) {
-    ir3 |= (uint64_t)EEPROM.read(ir3add + i) << (i * 8);
-  }
-  for (int i = 0; i < sizeof(ir4); ++i) {
-    ir4 |= (uint64_t)EEPROM.read(ir4add + i) << (i * 8);
-  }
-  for (int i = 0; i < sizeof(ir5); ++i) {
-    ir5 |= (uint64_t)EEPROM.read(ir5add + i) << (i * 8);
-  }
-  for (int i = 0; i < sizeof(ir6); ++i) {
-    ir6 |= (uint64_t)EEPROM.read(ir6add + i) << (i * 8);
-  }
-  for (int i = 0; i < sizeof(ir7); ++i) {
-    ir7 |= (uint64_t)EEPROM.read(ir7add + i) << (i * 8);
-  }
-  for (int i = 0; i < sizeof(ir8); ++i) {
-    ir8 |= (uint64_t)EEPROM.read(ir8add + i) << (i * 8);
-  }
+  for (int i = 0; i < sizeof(ir1); ++i) {  ir1 |= (uint64_t)EEPROM.read(ir1add + i) << (i * 8); }   /// I cannot understant this part copied fron chat GPT
+  for (int i = 0; i < sizeof(ir2); ++i) {  ir2 |= (uint64_t)EEPROM.read(ir2add + i) << (i * 8); }
+  for (int i = 0; i < sizeof(ir3); ++i) {  ir3 |= (uint64_t)EEPROM.read(ir3add + i) << (i * 8); }
+  for (int i = 0; i < sizeof(ir4); ++i) {  ir4 |= (uint64_t)EEPROM.read(ir4add + i) << (i * 8); }
+  for (int i = 0; i < sizeof(ir5); ++i) {  ir5 |= (uint64_t)EEPROM.read(ir5add + i) << (i * 8); }
+  for (int i = 0; i < sizeof(ir6); ++i) {  ir6 |= (uint64_t)EEPROM.read(ir6add + i) << (i * 8); }
+  for (int i = 0; i < sizeof(ir7); ++i) {  ir7 |= (uint64_t)EEPROM.read(ir7add + i) << (i * 8); }
+  for (int i = 0; i < sizeof(ir8); ++i) {  ir8 |= (uint64_t)EEPROM.read(ir8add + i) << (i * 8); }
 
 
   preRegVal = EEPROM.read(Reg);
@@ -525,24 +443,19 @@ void readDetails() {
   socket2ToggleOff = EEPROM.read(toggle2offadd);
   socket3ToggleOff = EEPROM.read(toggle3offadd);
   socket4ToggleOff = EEPROM.read(toggle4offadd);
-
   EEPROM.end();
 }
 
 void writeIR(int iradd, uint64_t irval) {
   EEPROM.begin(512);
-  for (int i = 0; i < sizeof(irval); ++i) {
-    EEPROM.write(iradd + i, (irval >> (i * 8)) & 0xFF);
-  }
+  for (int i = 0; i < sizeof(irval); ++i) {  EEPROM.write(iradd + i, (irval >> (i * 8)) & 0xFF); }
   EEPROM.commit();
   EEPROM.end();
 }
 
 void writeIP(String ip) {
   EEPROM.begin(512);
-  for (int i = 0; i < ip.length(); ++i) {
-    EEPROM.write(ipaddr + i, ip[i]);
-  }
+  for (int i = 0; i < ip.length(); ++i) {  EEPROM.write(ipaddr + i, ip[i]); }
   EEPROM.write(ipaddr + ip.length(), '\0');
   EEPROM.commit();
   EEPROM.end();
@@ -550,13 +463,13 @@ void writeIP(String ip) {
 
 void clearEEPROM() {
   EEPROM.begin(512);
-  for (int i = 0; i < 512; i++) {
-    EEPROM.write(i, 0);
-  }
+  for (int i = 0; i < 512; i++) {  EEPROM.write(i, 0); }
   EEPROM.commit();
   EEPROM.end();
 }
+// End The Part Of EEPROM___________________________________________________________________________________________________________________________________---
 
+/// Handle Client functions_________________________________________________________________________________________________________________________________---
 void handleRoot() {
   if (WiFi.status() == WL_CONNECTED) {
     server.send(200, "text/html", CONTROL());
@@ -576,15 +489,17 @@ void handleIP() {
   server.send(200, "text/html", Details());
 }
 
+void Close(){
+  putcondition(true, false);
+  ESP.restart();
+}
+
 void handledetails() {
   if (server.hasArg("ssid") && server.hasArg("password")) {
     SSID = server.arg("ssid");
     PASS = server.arg("password");
     saveDetails(SSID, PASS);
-    Serial.println("Received SSID: " + SSID);
-    Serial.println("Received Password: " + PASS);
     putcondition(true, true);
-    
     ESP.restart();
 
   } else {
@@ -608,7 +523,6 @@ void handleRTC() {
   server.send(200, "text/html", SETTIME());
 }
 
-
 void handleSendValue() {
   if (server.hasArg("value")) {
     value = server.arg("value");
@@ -620,128 +534,6 @@ void handleSendValue() {
     analogWrite(pwm, sliderValue);
   }
 }
-void timer() {
-  DateTime now = rtc.now();
-  if (socket1ToggleOn && flagon1) {
-
-    if ((socket1DayOn == now.dayOfTheWeek() || socket1DayOn == 7)) {
-
-      int Hour = socket1TimeOn.substring(0, socket1TimeOn.indexOf(":")).toInt();
-      int Minute = socket1TimeOn.substring(socket1TimeOn.indexOf(":") + 1).toInt();
-      
-      if (Hour == now.hour() && Minute == now.minute()) {
-        pin1status = true;
-        flagon1 = false;
-        ledState();
-      }
-    }
-  }
-
-  if (socket2ToggleOn && flagon2) {
-
-    if ((socket2DayOn == now.dayOfTheWeek() || socket2DayOn == 7)) {
-      int Hour = socket2TimeOn.substring(0, socket2TimeOn.indexOf(":")).toInt();
-      int Minute = socket2TimeOn.substring(socket2TimeOn.indexOf(":") + 1).toInt();
-      
-      if (Hour == now.hour() && Minute == now.minute()) {
-        pin2status = true;
-        flagon2 = false;
-        ledState();
-      }
-    }
-  }
-
-  if (socket3ToggleOn && flagon3) {
-
-    if ((socket3DayOn == now.dayOfTheWeek() || socket3DayOn == 7)) {
-      int Hour = socket3TimeOn.substring(0, socket3TimeOn.indexOf(":")).toInt();
-      int Minute = socket3TimeOn.substring(socket3TimeOn.indexOf(":") + 1).toInt();
-     
-      if (Hour == now.hour() && Minute == now.minute()) {
-        pin3status = true;
-        flagon3 = false;
-        ledState();
-      }
-    }
-  }
-
-  if (socket4ToggleOn && flagon4) {
-
-    if ((socket4DayOn == now.dayOfTheWeek() || socket4DayOn == 7)) {
-      int Hour = socket4TimeOn.substring(0, socket4TimeOn.indexOf(":")).toInt();
-      int Minute = socket4TimeOn.substring(socket4TimeOn.indexOf(":") + 1).toInt();
-      
-      if (Hour == now.hour() && Minute == now.minute()) {
-        pin4status = true;
-        flagon4 = false;
-        ledState();
-      }
-    }
-  }
-
-
-
-
-  if (socket1ToggleOff && flagoff1) {
-
-    if ((socket1DayOff == now.dayOfTheWeek() || socket1DayOff == 7)) {
-
-      int Hour = socket1TimeOff.substring(0, socket1TimeOff.indexOf(":")).toInt();
-      int Minute = socket1TimeOff.substring(socket1TimeOff.indexOf(":") + 1).toInt();
-      
-      if (Hour == now.hour() && Minute == now.minute()) {
-        pin1status = false;
-        flagoff1 = false;
-        ledState();
-      }
-    }
-  }
-  if (socket2ToggleOff && flagoff2) {
-
-    if ((socket2DayOff == now.dayOfTheWeek() || socket2DayOff == 7)) {
-      int Hour = socket2TimeOff.substring(0, socket2TimeOff.indexOf(":")).toInt();
-      int Minute = socket2TimeOff.substring(socket2TimeOff.indexOf(":") + 1).toInt();
-      
-      if (Hour == now.hour() && Minute == now.minute()) {
-        pin2status = false;
-        flagoff2 = false;
-        ledState();
-      }
-    }
-  }
-
-  if (socket3ToggleOff && flagoff3) {
-
-    if ((socket3DayOff == now.dayOfTheWeek() || socket3DayOff == 7)) {
-      int Hour = socket3TimeOff.substring(0, socket3TimeOff.indexOf(":")).toInt();
-      int Minute = socket3TimeOff.substring(socket3TimeOff.indexOf(":") + 1).toInt();
-      
-      if (Hour == now.hour() && Minute == now.minute()) {
-        pin3status = false;
-        flagoff3 = false;
-        ledState();
-      }
-    }
-  }
-
-  if (socket4ToggleOff && flagoff4) {
-
-    if ((socket4DayOff == now.dayOfTheWeek() || socket4DayOff == 7)) {
-      int Hour = socket4TimeOff.substring(0, socket4TimeOff.indexOf(":")).toInt();
-      int Minute = socket4TimeOff.substring(socket4TimeOff.indexOf(":") + 1).toInt();
-      
-      if (Hour == now.hour() && Minute == now.minute()) {
-        pin4status = false;
-        flagoff4 = false;
-        ledState();
-      }
-    }
-  }
-
-Serial.println(flagon1);
-}
-
-
 
 void handleData() {
   String json = server.arg("plain");
@@ -852,6 +644,157 @@ void hand4off() {
   ledState();
 }
 
+void handleRemote() {
+  server.send(200, "text/html", REMOTE());
+
+  while (add <= 70) {
+
+    while (irrecv.decode(&results) == 0) {
+      server.handleClient();
+      dnsServer.processNextRequest();
+      delay(150);
+    }
+    if (results.value != 18446744073709551615) {
+      writeIR(ir1add + add, results.value);
+      add = add + 10;
+      digitalWrite(Net, HIGH);
+      delay(200);
+      digitalWrite(Net, LOW);
+    }
+    irrecv.resume();
+  }
+  ESP.restart();
+}
+
+void handlereset() {
+  clearEEPROM();
+  putcondition(true, false);
+  ESP.restart();
+}
+
+void handleNotFound() {
+  server.sendHeader("Location", "/");
+  server.send(302, "text/plain", "");
+}
+/////handle client request functions..............................................................................................................................................
+
+////////Timer_______________________________________________________________________________________________________________________________________________-----
+void timer() {
+  DateTime now = rtc.now();
+  if (socket1ToggleOn && flagon1) {
+
+    if ((socket1DayOn == now.dayOfTheWeek() || socket1DayOn == 7)) {
+
+      int Hour = socket1TimeOn.substring(0, socket1TimeOn.indexOf(":")).toInt();
+      int Minute = socket1TimeOn.substring(socket1TimeOn.indexOf(":") + 1).toInt();
+      
+      if (Hour == now.hour() && Minute == now.minute()) {
+        pin1status = true;
+        flagon1 = false;
+        ledState();
+      }
+    }
+  }
+
+  if (socket2ToggleOn && flagon2) {
+
+    if ((socket2DayOn == now.dayOfTheWeek() || socket2DayOn == 7)) {
+      int Hour = socket2TimeOn.substring(0, socket2TimeOn.indexOf(":")).toInt();
+      int Minute = socket2TimeOn.substring(socket2TimeOn.indexOf(":") + 1).toInt();
+      
+      if (Hour == now.hour() && Minute == now.minute()) {
+        pin2status = true;
+        flagon2 = false;
+        ledState();
+      }
+    }
+  }
+
+  if (socket3ToggleOn && flagon3) {
+
+    if ((socket3DayOn == now.dayOfTheWeek() || socket3DayOn == 7)) {
+      int Hour = socket3TimeOn.substring(0, socket3TimeOn.indexOf(":")).toInt();
+      int Minute = socket3TimeOn.substring(socket3TimeOn.indexOf(":") + 1).toInt();
+     
+      if (Hour == now.hour() && Minute == now.minute()) {
+        pin3status = true;
+        flagon3 = false;
+        ledState();
+      }
+    }
+  }
+
+  if (socket4ToggleOn && flagon4) {
+
+    if ((socket4DayOn == now.dayOfTheWeek() || socket4DayOn == 7)) {
+      int Hour = socket4TimeOn.substring(0, socket4TimeOn.indexOf(":")).toInt();
+      int Minute = socket4TimeOn.substring(socket4TimeOn.indexOf(":") + 1).toInt();
+      
+      if (Hour == now.hour() && Minute == now.minute()) {
+        pin4status = true;
+        flagon4 = false;
+        ledState();
+      }
+    }
+  }
+
+  if (socket1ToggleOff && flagoff1) {
+
+    if ((socket1DayOff == now.dayOfTheWeek() || socket1DayOff == 7)) {
+      int Hour = socket1TimeOff.substring(0, socket1TimeOff.indexOf(":")).toInt();
+      int Minute = socket1TimeOff.substring(socket1TimeOff.indexOf(":") + 1).toInt();
+      if (Hour == now.hour() && Minute == now.minute()) {
+        pin1status = false;
+        flagoff1 = false;
+        ledState();
+      }
+    }
+  }
+  if (socket2ToggleOff && flagoff2) {
+
+    if ((socket2DayOff == now.dayOfTheWeek() || socket2DayOff == 7)) {
+      int Hour = socket2TimeOff.substring(0, socket2TimeOff.indexOf(":")).toInt();
+      int Minute = socket2TimeOff.substring(socket2TimeOff.indexOf(":") + 1).toInt();
+      
+      if (Hour == now.hour() && Minute == now.minute()) {
+        pin2status = false;
+        flagoff2 = false;
+        ledState();
+      }
+    }
+  }
+
+  if (socket3ToggleOff && flagoff3) {
+
+    if ((socket3DayOff == now.dayOfTheWeek() || socket3DayOff == 7)) {
+      int Hour = socket3TimeOff.substring(0, socket3TimeOff.indexOf(":")).toInt();
+      int Minute = socket3TimeOff.substring(socket3TimeOff.indexOf(":") + 1).toInt();
+      
+      if (Hour == now.hour() && Minute == now.minute()) {
+        pin3status = false;
+        flagoff3 = false;
+        ledState();
+      }
+    }
+  }
+
+  if (socket4ToggleOff && flagoff4) {
+
+    if ((socket4DayOff == now.dayOfTheWeek() || socket4DayOff == 7)) {
+      int Hour = socket4TimeOff.substring(0, socket4TimeOff.indexOf(":")).toInt();
+      int Minute = socket4TimeOff.substring(socket4TimeOff.indexOf(":") + 1).toInt();
+      
+      if (Hour == now.hour() && Minute == now.minute()) {
+        pin4status = false;
+        flagoff4 = false;
+        ledState();
+      }
+    }
+  }
+}
+/////// Timer _____________________________________________________________________________________________________________________________________________----
+
+//////update switch fro blynk server...............................................................................................................................
 BLYNK_WRITE(V1)
 {
   pin1status = static_cast<bool>(param.asInt());
@@ -872,58 +815,25 @@ BLYNK_WRITE(V4)
   pin4status = static_cast<bool>(param.asInt());
   ledState();
 }
+//////update switch fro blynk server...............................................................................................................................
 
-void handlereset() {
-  clearEEPROM();
-  putcondition(true, false);
-  ESP.restart();
-}
-
-void handleremote() {
-
-  server.send(200, "text/html", Remote());
-  
-
-  while (ir1add + add != 226) {
-
-    while (irrecv.decode(&results) == 0) {
-      server.handleClient();
-      dnsServer.processNextRequest();
-      delay(150);
-    }
-
-    if (results.value != 18446744073709551615) {
-      writeIR(ir1add + add, results.value);
-      add = add + 10;
-      digitalWrite(Net, HIGH);
-      delay(200);
-      digitalWrite(Net, LOW);
-    }
-    irrecv.resume();
-  }
-}
-
-void handleNotFound() {
-  server.sendHeader("Location", "/");
-  server.send(302, "text/plain", "");
-}
-
+/////ir remote & manual switch.....................................................................................................................................
 void sw() {
   if (digitalRead(sw1) != preSw1State) {
     pin1status = preSw1State;
-    preSw1State = digitalRead(sw1);
+    preSw1State = !preSw1State;
   }
   if (digitalRead(sw2) != preSw2State) {
     pin2status = preSw2State;
-    preSw2State = digitalRead(sw2);
+    preSw2State = !preSw2State;
   }
   if (digitalRead(sw3) != preSw3State) {
     pin3status = preSw3State;
-    preSw3State = digitalRead(sw3);
+    preSw3State = !preSw3State;
   }
   if (digitalRead(sw4) != preSw4State) {
     pin4status = preSw4State;
-    preSw4State = digitalRead(sw4);
+    preSw4State = !preSw4State;
   }
   if (int(((analogRead(A0) / 100) / 40.0) * 255) != preRegVal) {
     preRegVal = sliderValue = int(((analogRead(A0) / 100) / 40.0) * 255);
@@ -934,44 +844,13 @@ void sw() {
 }
 
 void remote() {
-  if (results.value == 0x1FE50AF || results.value == ir1) {
-    if (pin1status == true) {
-      pin1status = false;
-    } else {
-      pin1status = true;
-    }
-  }
-  if (results.value == 0x1FE807F) {
-    ESP.restart();
-  }
-
-  if (results.value == 0x1FED827 || results.value == ir2) {
-    if (pin2status == true) {
-      pin2status = false;
-    } else {     
-      pin2status = true;
-    }
-  }
-
-  if (results.value == 0x1FEF807 || results.value == ir3) {
-    if (pin3status == true) {
-      pin3status = false;
-    } else {
-      pin3status = true;
-    }
-  }
-
-  if (results.value == 0x1FE30CF || results.value == ir4) {
-    if (pin4status == true) {
-      pin4status = false;
-    } else {
-      pin4status = true;
-    }
-  }
-
+  if (results.value == 0x1FE50AF || results.value == ir1) { pin1status = !pin1status; }
+  if (results.value == 0x1FED827 || results.value == ir2) { pin2status = !pin2status; }
+  if (results.value == 0x1FEF807 || results.value == ir3) { pin3status = !pin3status; }
+  if (results.value == 0x1FE30CF || results.value == ir4) { pin4status = !pin4status; }  
+  if (results.value == 0x1FE807F) { ESP.restart(); }
   if (results.value == 0x1FE48B7 || results.value == ir6) {
-    bool status = (pin1status == false && pin2status == false && pin3status == false && pin4status == false) || (pin1status == true && pin2status == true && pin3status == true && pin4status == true);
-    if (status == true) {
+    if ((!pin1status && !pin2status && !pin3status && !pin4status) || (pin1status && pin2status && pin3status && pin4status)) {
       pin1status = !pin1status;
       pin2status = !pin2status;
       pin3status = !pin3status;
@@ -983,14 +862,9 @@ void remote() {
       pin4status = false;
     }
   }
-
   if (results.value == 33431775 || results.value == ir5) {
-    digitalWrite(Net, LOW);
-    delay(200);
-    digitalWrite(Net, HIGH);
-    delay(200);
-    digitalWrite(Net, LOW);
-    if (condition != false) {
+    for(int i = 0; i< 3; i++){digitalWrite(Net, LOW);delay(200);digitalWrite(Net, HIGH);delay(200);}
+    if (condition) {
       AP = true;
       putcondition(false, false);
       ESP.restart();
@@ -1014,92 +888,63 @@ void remote() {
   }
   ledState();
 }
+/////ir remote & manual switch.....................................................................................................................................
 
-void loop() {
-  server.handleClient();
-  dnsServer.processNextRequest();
-  if ((digitalRead(sw1) != preSw1State) || (digitalRead(sw2) != preSw2State) || (digitalRead(sw3) != preSw3State) || (digitalRead(sw4) != preSw4State) || (int(((analogRead(A0) / 100) / 40.0) * 255) != preRegVal)) {
-    sw();
-  }
-
-  if (WiFi.status() != WL_CONNECTED) {
-    digitalWrite(Net, LOW);
-    if (!AP) {
-      ESP.restart();
+///////core0....................................................................................................................................................
+void Task1Code(void * parameter){
+  while(true){
+    server.handleClient();
+    dnsServer.processNextRequest();
+    if ((digitalRead(sw1) != preSw1State) || (digitalRead(sw2) != preSw2State) || (digitalRead(sw3) != preSw3State) || (digitalRead(sw4) != preSw4State) || (int(((analogRead(A0) / 100) / 40.0) * 255) != preRegVal)) { sw(); }
+    if (irrecv.decode(&results)) { remote(); irrecv.resume(); }
+    if (digitalRead(config) == 0) {
+      for(int i = 0; i < 2; i++){ digitalWrite(Net, LOW);  delay(150);    digitalWrite(Net, HIGH);   delay(150); }
+      if (condition != false) {
+        AP = true;
+        putcondition(false,false);
+        ESP.restart();
+      } else {
+        putcondition(true, false);
+        ESP.restart();
+      }
     }
-  } else {
-    if(connected_to_blynk){
-      Blynk.run();
-    }else{
-      c++;
-      if(c == 10000){
-        if(Ping.ping(remote_ip, 1) && attempt < 5) { 
+
+  }
+}
+///core0........................................................................................................................................................
+//////core1..................................................................................................................................................
+void Task2Code(void * parameter){
+  while(true){
+    if (WiFi.status() != WL_CONNECTED) {
+      digitalWrite(Net, LOW);
+      if (!AP) { ESP.restart(); }
+    } else {
+      if(connected_to_blynk){
+        Blynk.run();
+      }else{
+        if(Ping.ping(remote_ip, 1)) { 
           Blynk.begin(auth, SSID.c_str(), PASS.c_str());
           connected_to_blynk = true;
         }
-        attempt++;
-        c=0;
       }
     }
-  }
-
-  if (!pin1status) {
-    digitalWrite(pin1, LOW);
-  } else {
-    digitalWrite(pin1, HIGH);
-  }
-  if (!pin2status) {
-    digitalWrite(pin2, LOW);
-  } else {
-    digitalWrite(pin2, HIGH);
-  }
-  if (!pin3status) {
-    digitalWrite(pin3, LOW);
-  } else {
-    digitalWrite(pin3, HIGH);
-  }
-  if (!pin4status) {
-    digitalWrite(pin4, LOW);
-  } else {
-    digitalWrite(pin4, HIGH);
-  }
-
-  if (digitalRead(config) == 0) {
-    digitalWrite(Net, LOW);
-    delay(200);
-    digitalWrite(Net, HIGH);
-    delay(200);
-    digitalWrite(Net, LOW);
-    if (condition != false) {
-      AP = true;
-      putcondition(false,false);
+    if (socket1ToggleOn|| socket1ToggleOff || socket2ToggleOn || socket2ToggleOff|| socket3ToggleOn|| socket3ToggleOff || socket4ToggleOn || socket4ToggleOff ) { timer(); }
+    DateTime now = rtc.now();
+    if((now.hour() == 00 && now.minute() == 1)){
       ESP.restart();
-    } else {
-      putcondition(true, false);
-      ESP.restart();
+      delay(60000);
     }
+    
   }
-  
-  
-    if (irrecv.decode(&results)) {
-    remote();
-    Serial.println(results.value);
-    irrecv.resume();
-  }
-  if (socket1ToggleOn|| socket1ToggleOff || socket2ToggleOn || socket2ToggleOff|| socket3ToggleOn|| socket3ToggleOff || socket4ToggleOn || socket4ToggleOff ) {
-    if (k == 1000) {
-      timer();
-      k = 0;
-    }
-    k++;
-  }
-  DateTime now = rtc.now();
-  if((now.hour() == 00 && now.minute() == 1) || (now.hour() == 6 && now.minute() == 1) || (now.hour() == 12 && now.minute() == 1) || (now.hour() == 18 && now.minute() == 1) ){
-    ESP.restart();
-  }
-  delay(10);
 }
 
+//core1.........................................................................................................................................................
+
+void loop() {
+  ///nothing here....
+}
+
+////////HTML codes.................................................................................................................................................
 String SETTIME(){
   String htmlString = "<!DOCTYPE html>\n";
     htmlString += "<html lang=\"en\">\n";
@@ -1483,7 +1328,7 @@ String TIMER() {
   htmlString += "        @media only screen and (max-width: 600px) {\n";
   htmlString += "            button {\n";
   htmlString += "                 color: white;\n";
-  htmlString += "                padding: 15px 170px;\n";
+  htmlString += "                padding: 15px 150px;\n";
   htmlString += "            }\n";
 
   htmlString += "        }\n";
@@ -1808,6 +1653,30 @@ String TIMER() {
 
   htmlString += "    <hr>\n";
   htmlString += "    <hr>\n";
+
+  DateTime now = rtc.now();
+  int hour = now.hour();
+  String ampm = "AM";
+  if (hour >= 12) {
+    ampm = "PM";
+    if (hour > 12) {
+      hour -= 12;
+    }
+  }
+  if (hour == 0) {
+    hour = 12;
+  }
+
+  String hourString = (hour < 10 ? "0" : "") + String(hour);
+  String minuteString = (now.minute() < 10 ? "0" : "") + String(now.minute());
+  String timeString = hourString + ":" + minuteString + " " + ampm;
+  htmlString += "        <H2>Time: " + timeString + "</H2>\n";
+  htmlString += "        <H2>Date: "+day[now.dayOfTheWeek()]+"</H2>\n";
+
+  htmlString += "    <hr>\n";
+  htmlString += "    <hr>\n";
+
+      
   htmlString += "<button onclick='sendData()'> SET </button>\n";
   htmlString += "\n";
   htmlString += "</body>\n";
@@ -1816,12 +1685,11 @@ String TIMER() {
   return htmlString;
 }
 
-String Remote() {
+String REMOTE() {
   String L = "<!DOCTYPE html>\n";
   L += "<html lang=\"en\">\n";
   L += "<head>\n";
   L += "    <meta charset=\"UTF-8\">\n";
-  L += "  <meta http-equiv=\"refresh\" content=\"1\"> \n";
   L += "    <title>IR Remote Switch Selection</title>\n";
   L += "    <style>\n";
   L += "        body {\n";
@@ -1861,51 +1729,47 @@ String Remote() {
   L += "            padding-bottom: 10px;\n";
   L += "            border-bottom: 2px solid #4285f4;\n";
   L += "        }\n";
-  if (ir1add + add == 156) {
+  if (add == 0) {
     L += "        .border-box:nth-child(1) {\n";
     L += "            border: 5px solid #e53935; /* Red color for Socket-1 */\n";
     L += "        }\n";
-
   }
-
-  else if (ir1add + add == 166) {
+  else if (add == 10) {
     L += "        .border-box:nth-child(2) {\n";
     L += "            border: 5px solid #e53935; /* Red color for Socket-1 */\n";
     L += "        }\n";
   }
 
-  else if (ir1add + add == 176) {
+  else if (add == 20) {
     L += "        .border-box:nth-child(3) {\n";
     L += "            border: 5px solid #e53935; /* Red color for Socket-1 */\n";
     L += "        }\n";
   }
 
-  else if (ir1add + add == 186) {
+  else if (add == 30) {
     L += "        .border-box:nth-child(4) {\n";
     L += "            border: 5px solid #e53935; \n";
     L += "        }\n";
   }
 
-  else if (ir1add + add == 196) {
+  else if (add == 40) {
     L += "        .border-box:nth-child(5) {\n";
     L += "            border: 5px solid #e53935; \n";
     L += "        }\n";
   }
 
-  else if (ir1add + add == 206) {
+  else if (add == 50) {
     L += "        .border-box:nth-child(6) {\n";
     L += "            border: 5px solid #e53935; \n";
     L += "        }\n";
-  } else if (ir1add + add == 216) {
+  } else if (add == 60) {
     L += "        .border-box:nth-child(7) {\n";
     L += "            border: 5px solid #e53935;\n";
     L += "        }\n";
-  } else if (ir1add + add == 226) {
+  } else if (add == 70) {
     L += "        .border-box:nth-child(8) {\n";
     L += "            border: 5px solid #e53935; \n";
     L += "        }\n";
-  } else {
-    ESP.restart();
   }
 
   L += "\n";
@@ -2182,3 +2046,4 @@ String CONTROL() {
   L += "</html>";
   return L;
 }
+/////HTML codes.................................................................................................................................................

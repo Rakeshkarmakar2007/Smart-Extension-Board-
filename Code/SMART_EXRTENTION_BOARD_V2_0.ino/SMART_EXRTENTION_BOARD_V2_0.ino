@@ -110,7 +110,7 @@ String value;
 
 bool preSw1State, preSw2State, preSw3State, preSw4State, flag = false, flagon1=true, flagon2=true, flagon3=true, flagon4=true, flagoff1=true, flagoff2=true, flagoff3=true, flagoff4=true;
 bool pin1status, pin2status, pin3status, pin4status, condition, var;
-int sliderValue, preRegVal;
+int slidervalue, preRegVal;
 int wifi = 0;
 bool AP = true, connected_to_blynk =  false;
 uint64_t ir1, ir2, ir3, ir4, ir5, ir6, ir7, ir8;
@@ -156,9 +156,9 @@ void setup() {
   irrecv.enableIRIn();
   digitalWrite(Net, LOW);
   readDetails();
-  analogWrite(pwm, sliderValue);  // update fan speed
+  analogWrite(pwm, slidervalue);  // update fan speed
   sw();                           //update switches
-  value = String((sliderValue / 255.0) * 100);
+  value = String((slidervalue / 255.0) * 100);
 
   xTaskCreatePinnedToCore(Task1Code, "Task 1", 10000, NULL, 10, &Task1, 0);           
   if ((wifi == 1) && (condition)) {
@@ -211,7 +211,7 @@ void setup() {
   server.on("/RTC", handleRTC);
   server.on("/close", Close);
   server.onNotFound(handleNotFound);
-  xTaskCreatePinnedToCore(Task2Code, "Task 2", 10000, NULL, 5, &Task2, 1);   
+  xTaskCreatePinnedToCore(Task2Code, "Task 2", 10000, NULL, 10, &Task2, 1);   
 }
 // END void setup___________________________________________________________________________________________________________________________________________---
 
@@ -227,7 +227,7 @@ void ledState() {
   EEPROM.write(sw2add, preSw2State);
   EEPROM.write(sw3add, preSw3State);
   EEPROM.write(sw4add, preSw4State);
-  EEPROM.write(sliderAdd, sliderValue);
+  EEPROM.write(sliderAdd, slidervalue);
   EEPROM.commit();
   EEPROM.end();
 
@@ -236,6 +236,7 @@ void ledState() {
     Blynk.virtualWrite(2, pin2status? HIGH : LOW);
     Blynk.virtualWrite(3, pin3status? HIGH : LOW);
     Blynk.virtualWrite(4, pin4status? HIGH : LOW);
+    Blynk.virtualWrite(5, value.toInt());
   }
   
   digitalWrite(pin1, pin1status? HIGH : LOW);
@@ -346,7 +347,7 @@ void readDetails() {
   pin3status = EEPROM.read(l3);
   pin4status = EEPROM.read(l4);
   wifi = EEPROM.read(wifiStatus);
-  sliderValue = 0;
+  slidervalue = 0;
 
   for (int i = 0; i < sizeof(ir1); ++i) {  ir1 |= (uint64_t)EEPROM.read(ir1add + i) << (i * 8); }   /// I cannot understant this part copied fron chat GPT
   for (int i = 0; i < sizeof(ir2); ++i) {  ir2 |= (uint64_t)EEPROM.read(ir2add + i) << (i * 8); }
@@ -363,7 +364,7 @@ void readDetails() {
   preSw2State = EEPROM.read(sw2add);
   preSw3State = EEPROM.read(sw3add);
   preSw4State = EEPROM.read(sw4add);
-  sliderValue = EEPROM.read(sliderAdd);
+  slidervalue = EEPROM.read(sliderAdd);
 
   socket1DayOn = EEPROM.read(day1onadd);
   socket2DayOn = EEPROM.read(day2onadd);
@@ -526,12 +527,13 @@ void handleRTC() {
 void handleSendValue() {
   if (server.hasArg("value")) {
     value = server.arg("value");
-    sliderValue = (value.toInt() / 100.0) * 255;
+    slidervalue = (value.toInt() / 100.0) * 255;
     EEPROM.begin(512);
-    EEPROM.write(sliderAdd, sliderValue);
+    EEPROM.write(sliderAdd, slidervalue);
     EEPROM.commit();
     EEPROM.end();
-    analogWrite(pwm, sliderValue);
+    analogWrite(pwm, slidervalue);
+    if(connected_to_blynk){Blynk.virtualWrite(5, value.toInt());}
   }
 }
 
@@ -815,7 +817,19 @@ BLYNK_WRITE(V4)
   pin4status = static_cast<bool>(param.asInt());
   ledState();
 }
-//////update switch from blynk server...............................................................................................................................
+BLYNK_WRITE(V5)
+{
+  int slider = param.asInt(); 
+  value = String(slider);
+  slidervalue = (value.toInt() / 100.0) * 255;
+  analogWrite(pwm, slidervalue);
+  EEPROM.begin(512);
+  EEPROM.write(sliderAdd, slidervalue);
+  EEPROM.commit();
+  EEPROM.end();
+  Blynk.virtualWrite(5, value.toInt());
+}
+//////update switch fro blynk server...............................................................................................................................
 
 /////ir remote & manual switch.....................................................................................................................................
 void sw() {
@@ -836,9 +850,9 @@ void sw() {
     preSw4State = !preSw4State;
   }
   if (int(((analogRead(A0) / 100) / 40.0) * 255) != preRegVal) {
-    preRegVal = sliderValue = int(((analogRead(A0) / 100) / 40.0) * 255);
+    preRegVal = slidervalue = int(((analogRead(A0) / 100) / 40.0) * 255);
     value = String(((analogRead(A0) / 100) / 40.0) * 100);
-    analogWrite(pwm, sliderValue);
+    analogWrite(pwm, slidervalue);
   }
   ledState();
 }
@@ -863,7 +877,6 @@ void remote() {
     }
   }
   if (results.value == 33431775 || results.value == ir5) {
-    for(int i = 0; i< 3; i++){digitalWrite(Net, LOW);delay(200);digitalWrite(Net, HIGH);delay(200);}
     if (condition) {
       AP = true;
       putcondition(false, false);
@@ -874,17 +887,17 @@ void remote() {
     }
   }
   if (results.value == 0x1FEA05F || results.value == ir7) {
-    sliderValue -= 25;
-    if (sliderValue < 0) { sliderValue = 0; }
-    value = String((sliderValue / 255.0) * 100);
-    analogWrite(pwm, sliderValue);
+    slidervalue -= 25;
+    if (slidervalue < 0) { slidervalue = 0; }
+    value = String((slidervalue / 255.0) * 100);
+    analogWrite(pwm, slidervalue);
   }
 
   if (results.value == 0x1FE609F || results.value == ir8) {
-    sliderValue += 25;
-    if (sliderValue > 250) { sliderValue = 255; }
-    value = String((sliderValue / 255.0) * 100);
-    analogWrite(pwm, sliderValue);
+    slidervalue += 25;
+    if (slidervalue > 250) { slidervalue = 255; }
+    value = String((slidervalue / 255.0) * 100);
+    analogWrite(pwm, slidervalue);
   }
   ledState();
 }
@@ -892,21 +905,26 @@ void remote() {
 
 ///////core0....................................................................................................................................................
 void Task1Code(void * parameter){
+  unsigned long presstime;
+
   while(true){
     server.handleClient();
     dnsServer.processNextRequest();
     if ((digitalRead(sw1) != preSw1State) || (digitalRead(sw2) != preSw2State) || (digitalRead(sw3) != preSw3State) || (digitalRead(sw4) != preSw4State) || (int(((analogRead(A0) / 100) / 40.0) * 255) != preRegVal)) { sw(); }
     if (irrecv.decode(&results)) { remote(); irrecv.resume(); }
-    if (digitalRead(config) == 0) {
-      for(int i = 0; i < 2; i++){ digitalWrite(Net, LOW);  delay(150);    digitalWrite(Net, HIGH);   delay(150); }
-      if (condition != false) {
-        AP = true;
-        putcondition(false,false);
-        ESP.restart();
-      } else {
-        putcondition(true, false);
-        ESP.restart();
+    if (digitalRead(config) == LOW) {
+      if(millis() - presstime >= 3000){   
+        if (condition != false) {
+          AP = true;
+          putcondition(false,false);
+          ESP.restart();
+        } else {
+          putcondition(true, false);
+          ESP.restart();
+        }
       }
+    }else{
+      presstime  = millis();
     }
 
   }
@@ -916,7 +934,6 @@ void Task1Code(void * parameter){
 void Task2Code(void * parameter){
   while(true){
     if (WiFi.status() != WL_CONNECTED) {
-      digitalWrite(Net, LOW);
       if (!AP) { ESP.restart(); }
     } else {
       if(connected_to_blynk){
@@ -1321,7 +1338,7 @@ String TIMER() {
   htmlString += "            cursor: pointer;\n";
   htmlString += "        }\n";
   htmlString += "\n";
-  htmlString += "        button:hover {\n";
+  htmlString += "        button:checked {\n";
   htmlString += "            background-color: rgb(255, 130, 00);\n";
   htmlString += "        }\n";
 

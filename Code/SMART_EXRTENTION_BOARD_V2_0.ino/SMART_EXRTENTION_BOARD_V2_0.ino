@@ -87,7 +87,6 @@
 #define sw4 27
 #define config 32
 //end gpio
-
 DNSServer dnsServer;
 RTC_DS1307 rtc;
 WiFiUDP ntpUDP;
@@ -211,7 +210,7 @@ void setup() {
   server.on("/RTC", handleRTC);
   server.on("/close", Close);
   server.onNotFound(handleNotFound);
-  xTaskCreatePinnedToCore(Task2Code, "Task 2", 10000, NULL, 10, &Task2, 1);   
+  xTaskCreatePinnedToCore(Task2Code, "Task 2", 10000, NULL, 1, &Task2, 1);   
 }
 // END void setup___________________________________________________________________________________________________________________________________________---
 
@@ -478,9 +477,9 @@ void handleRoot() {
     if (WiFi.scanComplete() != -1) {
       server.send(200, "text/html", LOGIN());
       WiFi.scanNetworks(true, true);
+    }else{
+     server.send(200, "text/html", LOGIN());
     }
-    delay(3500);
-    server.send(200, "text/html", LOGIN());
   } else {
     server.send(200, "text/html", ADDRESS());
   }
@@ -528,10 +527,6 @@ void handleSendValue() {
   if (server.hasArg("value")) {
     value = server.arg("value");
     slidervalue = (value.toInt() / 100.0) * 255;
-    EEPROM.begin(512);
-    EEPROM.write(sliderAdd, slidervalue);
-    EEPROM.commit();
-    EEPROM.end();
     analogWrite(pwm, slidervalue);
     if(connected_to_blynk){Blynk.virtualWrite(5, value.toInt());}
   }
@@ -589,9 +584,9 @@ void handleWiFi() {
   if (WiFi.scanComplete() != -1) {
     server.send(200, "text/html", LOGIN());
     WiFi.scanNetworks(true, true);
+  }else{
+    server.send(200, "text/html", LOGIN());
   }
-  delay(3500);
-  server.send(200, "text/html", LOGIN());
 }
 
 void handleTimer() {
@@ -823,10 +818,6 @@ BLYNK_WRITE(V5)
   value = String(slider);
   slidervalue = (value.toInt() / 100.0) * 255;
   analogWrite(pwm, slidervalue);
-  EEPROM.begin(512);
-  EEPROM.write(sliderAdd, slidervalue);
-  EEPROM.commit();
-  EEPROM.end();
   Blynk.virtualWrite(5, value.toInt());
 }
 //////update switch fro blynk server...............................................................................................................................
@@ -935,14 +926,21 @@ void Task2Code(void * parameter){
   while(true){
     if (WiFi.status() != WL_CONNECTED) {
       if (!AP) { ESP.restart(); }
-    } else {
+    } else if(WiFi.status() == WL_CONNECTED){
       if(connected_to_blynk){
         Blynk.run();
       }else{
         if(Ping.ping(remote_ip, 1)) { 
           Blynk.begin(auth, SSID.c_str(), PASS.c_str());
           connected_to_blynk = true;
+        }else{
+          connected_to_blynk = false;
         }
+        EEPROM.begin(512);
+        EEPROM.write(500, connected_to_blynk);
+        EEPROM.commit();
+        EEPROM.end();
+        delay(10000);
       }
     }
     if (socket1ToggleOn|| socket1ToggleOff || socket2ToggleOn || socket2ToggleOff|| socket3ToggleOn|| socket3ToggleOff || socket4ToggleOn || socket4ToggleOff ) { timer(); }
@@ -1090,9 +1088,16 @@ String Details() {
   L += "    </header>\n";
   L += "\n";
   L += "    <main>\n";
-  L += "        <p>SSID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;&nbsp; " + SSID + " </p>\n";
-  L += "        <p>Password &nbsp;&nbsp;    : &nbsp;&nbsp; &nbsp;গোপনীয়</p>\n";
-  L += "        <p>IP Address &nbsp;  : &nbsp;&nbsp;&nbsp;&nbsp; " + IP + " </p>\n";
+ L += "         <p>SSID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"+SSID+"</p>\n";
+ EEPROM.begin(512);
+ bool internet = EEPROM.read(500);
+ EEPROM.end();
+if (internet) {
+  L += "        <p>Internet connection&nbsp;&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Connected</p>\n";
+} else {
+  L += "        <p>Internet connection&nbsp;&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Not Connected</p>\n";
+}
+L += "         <p>IP Address&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;"+IP+"</p>\n";
   L += "    </main>\n";
   L += "\n";
   L += "</body>\n";
@@ -1188,48 +1193,167 @@ String LOGIN() {
   L += "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
   L += "    <title>SMART CONTROL</title>\n";
   L += "    <style>\n";
+    L += "        body {\n";
+  L += "             background-color: white;\n";
+  L += "             font-family: Arial, sans-serif;\n";
+  L += "             justify-content: center;\n";
+  L += "             align-items: center;\n";
+  L += "             height: 100vh;\n";
+  L += "             margin: 0;\n";
+  L += "        }\n";
+  L += "        .title {\n";
+  L += "            font-size: 15px;\n";
+  L += "            text-align: center;\n";
+  L += "        }\n";
+  L += "        .container {\n";
+  L += "             background-color: rgb(216, 216, 216);\n";
+  L += "             border-radius: 12px;\n";
+  L += "             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);\n";
+  L += "             padding: 40px;\n";
+  L += "             max-width: 600px;\n";
+  L += "             width: 100%;\n";
+  L += "             margin-top: 80px;\n";
+  L += "             animation: fadeIn 1s ease-in-out;\n";
+  L += "             margin: auto;\n";
+  L += "        }\n";
   L += "        .login-form {\n";
-  L += "            margin-top: 20px;\n";
   L += "            display: flex;\n";
   L += "            flex-direction: column;\n";
+  L += "            gap: 15px;\n";
+  L += "            position: relative;\n";
+  L += "        }\n";
+  L += "        label {\n";
+  L += "            font-size: 16px;\n";
+  L += "            color: #333;\n";
+  L += "            margin-bottom: 5px;\n";
   L += "        }\n";
   L += "        .login-input {\n";
-  L += "            margin-bottom: 10px;\n";
-  L += "            padding: 5px;\n";
+  L += "            padding: 10px;\n";
   L += "            font-size: 16px;\n";
+  L += "            border: 1px solid #ccc;\n";
+  L += "            border-radius: 4px;\n";
+  L += "            width: 100%;\n";
+  L += "            box-sizing: border-box;\n";
   L += "        }\n";
   L += "        .login-submit {\n";
-  L += "            padding: 10px;\n";
+  L += "            padding: 12px;\n";
   L += "            font-size: 18px;\n";
-  L += "            background-color: #4CAF50;\n";
+  L += "            background-color: #006b47;\n";
   L += "            color: white;\n";
   L += "            border: none;\n";
-  L += "            border-radius: 5px;\n";
+  L += "            border-radius: 6px;\n";
   L += "            cursor: pointer;\n";
+  L += "            transition: background-color 0.3s;\n";
+  L += "        }\n";
+  L += "        .login-submit:hover {\n";
+  L += "            background-color: #004b34;\n";
+  L += "        }\n";
+  L += "        h3 {\n";
+  L += "            text-align: center;\n";
+  L += "            color: #333;\n";
+  L += "        }\n";
+  L += "        .login-container{\n";                           
+  L += "          background-color: #fff;\n";
+  L += "          border-radius: 8px;\n";
+  L += "          padding: 40px;\n";
+  L += "          max-width: 520px;\n";
+  L += "          width: 100%;\n";
+  L += "          align-items: center; \n";
+  L += "          justify-content: center; \n";
+  L += "          margin: auto\n";
+  L += "        }\n"; 
+  L += "        ul {\n";
+  L += "            display: flex;\n";
+  L += "            justify-content: space-around;\n";
+  L += "            padding: 0;\n";
+  L += "            margin-top: 15px;\n";
+  L += "            list-style-type: none;\n";
+  L += "            flex-wrap: wrap;\n"; // Allow items to wrap on smaller screens
+  L += "        }\n";
+  L += "        ul li {\n";
+  L += "            background: #f5f5f5;\n";
+  L += "            padding: 10px 20px;\n";
+  L += "            border-radius: 50px;\n";
+  L += "            font-size: 14px;\n";
+  L += "            color: #333;\n";
+  L += "            cursor: pointer;\n";
+  L += "            transition: all 0.3s ease;\n";
+  L += "            text-align: center;\n";
+  L += "            flex: 1 1 30%;\n";  // Ensure items take at least 30% of width
+  L += "            margin: 5px;\n";
+  L += "            max-width: 150px;\n";
+  L += "        }\n";
+  L += "        ul li:hover {\n";
+  L += "            background-color: #d1f0e1;\n";
+  L += "            color: #006b47;\n";
+  L += "            transform: scale(1.05);\n";
+  L += "        }\n";
+  L += "        .field-icon {\n";
+  L += "            position: absolute;\n";
+  L += "            right: 10px;\n";
+  L += "            top: 50%;\n";
+  L += "            transform: translateY(-50%);\n";
+  L += "            cursor: pointer;\n";
+  L += "        }\n";
+  L += "        @keyframes fadeIn {\n";
+  L += "            from {opacity: 0;}\n";
+  L += "            to {opacity: 1;}\n";
+  L += "        }\n";
+  L += "        @media (max-width: 600px) {\n";
+  L += "            .container {\n";
+  L += "                padding: 20px;\n";
+  L += "                max-width: 340px;\n";
+  L += "            }\n";
+  L += "            .login-container {\n";
+  L += "                padding: 20px;\n";
+  L += "                max-width: 300px;\n";
+  L += "            }\n";
   L += "        }\n";
   L += "    </style>\n";
   L += "</head>\n";
   L += "<body>\n";
-  L += "    <Center><h1>Connect To Your WiFi Network</h1></Center></br> \n";
-  L += "    <h3> Available Networks: </h3>\n";
-  L += " <ul>\n";
+  L += "    <div class=\"title\"><h1>Connect To Your WiFi Network</h1></div>\n"; // Title fixed at the top
+  L += "    <div class=\"container\">\n";
+  L += "        <h3>Available Networks:</h3>\n";
+  L += "        <ul>\n";
   int numNetworks = WiFi.scanComplete();
-  if (numNetworks < 0) {
-    L += "<li>No networks found</li>";
+  if (numNetworks == -1) {
+    L += "            <li>No networks found</li>\n";
   } else {
     for (int i = 0; i < numNetworks; ++i) {
-      L += " <li onclick = \"populateSSID('" + WiFi.SSID(i) + "')\">" + WiFi.SSID(i) + "</li>\n";
+      L += "            <li onclick=\"populateSSID('" + WiFi.SSID(i) + "')\">" + WiFi.SSID(i) + "</li>\n";
     }
   }
-  L += "</ul>\n";
-  L += "    <div class=\"login-form\">\n";
-  L += "        <label for=\"ssid\" class=\"login-input\">WiFi SSID:</label>\n";
-  L += "        <input type=\"text\" id=\"ssid\" name=\"ssid\" class=\"login-input\" required>\n";
-  L += "        <label for=\"password\" class=\"login-input\">WiFi Password:</label>\n";
-  L += "        <input type=\"password\" id=\"password\" name=\"password\" class=\"login-input\" required>\n";
-  L += "        <button class=\"login-submit\" onclick=\"submitForm()\">Submit</button>\n";
+  L += "        </ul>\n";
+  L += "        <div class=\"login-container\">\n";
+  L += "            <div class=\"login-form\">\n";
+  L += "                <label for=\"ssid\">WiFi SSID:</label>\n";
+  L += "                <input type=\"text\" id=\"ssid\" name=\"ssid\" class=\"login-input\" required>\n";
+  L += "                <label for=\"password\">WiFi Password:</label>\n";
+  L += "                <div style=\"position: relative;\">\n";
+  L += "                    <input type=\"password\" id=\"password\" name=\"password\" class=\"login-input\" required>\n";
+  L += "                    <span class=\"field-icon\" onclick=\"togglePassword()\">\n";
+  L += "                        <svg id=\"eye-icon\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n";
+  L += "                            <path id=\"eye-path\" d=\"M12 4.5C6 4.5 1.73 8.11 0 12c1.73 3.89 6 7.5 12 7.5s10.27-3.61 12-7.5c-1.73-3.89-6-7.5-12-7.5zM12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm4.1-4.1l-1.4-1.4-2.5-2.5-4.5-4.5-1.4-1.4 1.4-1.4L6.1 8.9l-2.5-2.5 1.4-1.4 6.4 6.4 1.4 1.4 2.5 2.5 1.4 1.4-1.4 1.4z\" fill=\"#000\"/>\n";
+  L += "                        </svg>\n";
+  L += "                    </span>\n";
+  L += "                </div>\n";
+  L += "                <button class=\"login-submit\" onclick=\"submitForm()\">Submit</button>\n";
+  L += "            </div>\n";
+  L += "        </div>\n";
   L += "    </div>\n";
   L += "<script>\n";
+  L += "    function togglePassword() {\n";
+  L += "        var passwordField = document.getElementById('password');\n";
+  L += "        var eyePath = document.getElementById('eye-path');\n";
+  L += "        if (passwordField.type === 'password') {\n";
+  L += "            passwordField.type = 'text';\n";
+  L += "            eyePath.setAttribute('d', 'M12 4.5C6 4.5 1.73 8.11 0 12c1.73 3.89 6 7.5 12 7.5s10.27-3.61 12-7.5c-1.73-3.89-6-7.5-12-7.5zM12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm0-10c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z');\n";
+  L += "        } else {\n";
+  L += "            passwordField.type = 'password';\n";
+  L += "            eyePath.setAttribute('d', 'M12 4.5C6 4.5 1.73 8.11 0 12c1.73 3.89 6 7.5 12 7.5s10.27-3.61 12-7.5c-1.73-3.89-6-7.5-12-7.5zM12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6zm4.1-4.1l-1.4-1.4-2.5-2.5-4.5-4.5-1.4-1.4 1.4-1.4L6.1 8.9l-2.5-2.5 1.4-1.4 6.4 6.4 1.4 1.4 2.5 2.5 1.4 1.4-1.4 1.4z');\n";
+  L += "        }\n";
+  L += "    }\n";
   L += "function populateSSID(ssid) {\n";
   L += "    document.getElementById('ssid').value = ssid;\n";
   L += "}\n";
